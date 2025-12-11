@@ -1,0 +1,68 @@
+services:
+  mysql:
+    image: mysql:latest
+    container_name: smarthouse-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: smart-house
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - smarthouse-network
+
+  backend:
+    build:
+      context: ./Smart_Home_back
+    container_name: smarthouse-backend
+    ports:
+      - "8085:8085"
+    depends_on:
+      mysql:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/smart-house
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8085/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - smarthouse-network
+    restart: on-failure
+
+  frontend:
+    build:
+      context: ./smartHome-front
+    container_name: smarthouse-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - smarthouse-network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: smarthouse-phpmyadmin
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "8081:80"
+    depends_on:
+      - mysql
+    networks:
+      - smarthouse-network
+
+networks:
+  smarthouse-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
