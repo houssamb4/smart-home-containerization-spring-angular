@@ -1,5 +1,5 @@
 # Stage 1: Build with Node.js
-FROM node:14.15.0-alpine as builder
+FROM node:20-alpine as builder
 WORKDIR /app
 COPY . .
 RUN npm install

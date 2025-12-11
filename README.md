@@ -1,92 +1,114 @@
-# TP 24 : Conteneurisation Spring Angular
+# Application Smart Home - Conteneurisation Spring Boot & Angular
 
-Conteneurisation du projet Smart Home avec un backend Spring Boot, un frontend Angular et une base de données MySQL. Le projet inclut les Dockerfiles des deux parties ainsi qu’un fichier Docker Compose pour orchestrer l’ensemble de l’application. Ce TP montre comment organiser, construire et exécuter une application full-stack dans des conteneurs.
+## Description
 
+Ce projet démontre la conteneurisation d'une application Smart Home full-stack utilisant Spring Boot pour le backend, Angular pour le frontend, et MySQL pour la base de données. L'application est orchestrée via Docker Compose pour un déploiement simplifié.
 
-Etape 1 : Organiser la structure du projet
-Pour containeriser une application Smart Home composée d'une application backend Spring Boot avec MySQL et d'une application frontend Angular, vous avez déjà créé des Dockerfiles pour chaque partie (backend et frontend) ainsi qu'un fichier docker-compose pour orchestrer ces services. Voici les étapes à suivre pour containeriser et exécuter l'application :
+## Prérequis
 
-Cloner les projets depuis https://github.com/lachgar/smarthouse.git.
+- Docker (version 20.10 ou supérieure)
+- Docker Compose (version 2.0 ou supérieure)
 
-Assurer que le projet est organisé correctement, en deux dossiers principaux, un pour le backend (Smart_Home_back) et un pour le frontend (smartHome-front). Assurer que tous les fichiers nécessaires pour construire chaque partie de l'application sont présents dans ces dossiers.
+## Structure du Projet
 
-Uploaded Image
-Ensuite, lancer et tester les projets en local.
+```
+.
+├── Smart_Home_back/          # Backend Spring Boot
+│   ├── Dockerfile
+│   ├── pom.xml
+│   └── src/
+├── smartHome-front/          # Frontend Angular
+│   ├── Dockerfile
+│   ├── package.json
+│   └── src/
+├── docker-compose.yml        # Configuration Docker Compose
+└── README.md
+```
 
+## Configuration Docker
 
-Etape 2 : Créer les Dockerfiles
-Créer les fichiers Dockerfiles pour le backend et le frontend.
+![Docker Files Overview](https://github.com/user-attachments/assets/8dde9e52-a5d6-491d-840b-82510d304328)
 
-./images/image.png
+### Dockerfiles
 
-Backend :
+#### Backend
+
+```dockerfile
 # Stage 1: Build with Maven
-FROM maven:3.8.4-openjdk-17 AS builder
+FROM maven:3.9.9-eclipse-temurin-21 AS builder
 WORKDIR /app
 COPY ./src ./src
 COPY ./pom.xml .
-RUN mvn clean package
+RUN mvn clean package -DskipTests
 
 # Stage 2: Create the final image
-FROM openjdk:17-jdk-alpine
+FROM eclipse-temurin:21-jdk-alpine
 VOLUME /tmp
 ARG JAR_FILE=target/*.jar
-COPY ${JAR_FILE} app.jar
+COPY --from=builder /app/${JAR_FILE} app.jar
 ENTRYPOINT ["java","-jar","/app.jar"]
-Explication :
-Étape 1: Build with Maven
+```
 
-FROM maven:3.8.4-openjdk-17 AS builder: Utilise l'image Maven 3.8.4 avec OpenJDK 17 comme base pour la première étape de construction et la nomme "builder".
-WORKDIR /app: Définit le répertoire de travail à l'intérieur du conteneur comme /app.
-COPY ./src ./src: Copie le répertoire source de l'application dans le répertoire de travail du conteneur.
-COPY ./pom.xml .: Copie le fichier pom.xml à la racine du répertoire de travail du conteneur.
-RUN mvn clean package: Exécute la commande Maven pour nettoyer le projet et construire le package JAR.
-Étape 2: Create the final image
+**Explication :**
 
-FROM openjdk:17-jdk-alpine: Utilise l'image Alpine Linux avec OpenJDK 17 comme base pour la deuxième étape de construction.
-VOLUME /tmp: Définit un volume /tmp qui peut être utilisé pour stocker des fichiers temporaires ou des données persistantes.
-ARG JAR_FILE=target/*.jar: Définit un argument pour le fichier JAR généré lors de la construction de l'application.
-COPY ${JAR_FILE} app.jar: Copie le fichier JAR construit depuis l'étape précédente dans le répertoire / du conteneur et le renomme en app.jar.
-ENTRYPOINT ["java","-jar","/app.jar"]: Définit la commande d'entrée pour exécuter l'application Java en utilisant le fichier JAR.
-Frontend :
-FROM node:14.15.0-alpine as builder
+- **Étape 1 : Build avec Maven**
+  - `FROM maven:3.9.9-eclipse-temurin-21 AS builder` : Utilise l'image Maven 3.9.9 avec Eclipse Temurin OpenJDK 21 pour la construction.
+  - `WORKDIR /app` : Définit le répertoire de travail.
+  - `COPY ./src ./src` et `COPY ./pom.xml .` : Copie les sources et le fichier de configuration Maven.
+  - `RUN mvn clean package -DskipTests` : Construit le JAR en sautant les tests pour accélérer le build.
+
+- **Étape 2 : Image finale**
+  - `FROM eclipse-temurin:21-jdk-alpine` : Image légère avec OpenJDK 21.
+  - `COPY --from=builder /app/${JAR_FILE} app.jar` : Copie le JAR depuis l'étape de build.
+  - `ENTRYPOINT ["java","-jar","/app.jar"]` : Lance l'application.
+
+#### Frontend
+
+```dockerfile
+# Stage 1: Build with Node.js
+FROM node:20-alpine as builder
 WORKDIR /app
 COPY . .
 RUN npm install
 RUN npm run build
 
+# Stage 2: Serve with Nginx
 FROM nginx:alpine
 COPY --from=builder /app/dist/smart-home /usr/share/nginx/html
-Explication :
-Étape 1 (Construction avec Node.js) :
+```
 
-FROM node:14.15.0-alpine as builder : Utilise l'image Node.js 14.15.0 avec Alpine Linux comme base pour la première étape et la nomme "builder".
-WORKDIR /app : Définit le répertoire de travail à l'intérieur du conteneur sur /app.
-COPY . . : Copie tous les fichiers du répertoire actuel (machine hôte) vers le répertoire de travail à l'intérieur du conteneur.
-RUN npm install : Installe les dépendances du projet à l'aide du gestionnaire de paquets npm.
-RUN npm run build : Construit l'application selon le script de construction défini dans le projet.
-Étape 2 (Création de l'image finale avec Nginx) :
+**Explication :**
 
-FROM nginx:alpine : Utilise l'image Nginx avec Alpine Linux comme base pour la deuxième étape.
-COPY --from=builder /app/dist/smart-home /usr/share/nginx/html : Copie l'application construite depuis l'étape "builder" (/app/dist/smart-home) vers le répertoire HTML par défaut du serveur Nginx (/usr/share/nginx/html). Cela configure Nginx pour servir les fichiers statiques de l'application construite.  
+- **Étape 1 : Build avec Node.js**
+  - `FROM node:20-alpine as builder` : Image Node.js 20 pour la construction.
+  - `COPY . .` : Copie tous les fichiers du projet.
+  - `RUN npm install` et `RUN npm run build` : Installe les dépendances et construit l'application.
 
-Etape 3 : Construire les images Docker
-Créer le fichier docker-compose.yml dans le dossier racine.
+- **Étape 2 : Serveur Nginx**
+  - `FROM nginx:alpine` : Image Nginx légère.
+  - `COPY --from=builder /app/dist/smart-home /usr/share/nginx/html` : Copie les fichiers construits vers Nginx.
 
-Uploaded Image
-version: '3'
+### Docker Compose
+
+```yaml
 services:
   mysql:
     image: mysql:latest
+    container_name: smarthouse-mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: smart-house
     ports:
       - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - smarthouse-network
 
   backend:
     build:
       context: ./Smart_Home_back
+    container_name: smarthouse-backend
     ports:
       - "8085:8085"
     depends_on:
@@ -97,68 +119,94 @@ services:
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
     healthcheck:
-      test: "/usr/bin/mysql --user=root --password=root --execute \"SHOW DATABASES;\""
-      interval: 5s
-      timeout: 2s
-      retries: 100
+      test: [ "CMD", "curl", "-f", "http://localhost:8085/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - smarthouse-network
+    restart: on-failure
 
   frontend:
     build:
       context: ./smartHome-front
+    container_name: smarthouse-frontend
     ports:
       - "80:80"
     depends_on:
       backend:
         condition: service_started
+    networks:
+      - smarthouse-network
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
+    container_name: smarthouse-phpmyadmin
     environment:
       PMA_HOST: mysql
       PMA_PORT: 3306
       MYSQL_ROOT_PASSWORD: root
     ports:
       - "8081:80"
-Explication
-mysql:
+    depends_on:
+      - mysql
+    networks:
+      - smarthouse-network
 
-Utilise l'image MySQL la plus récente disponible.
-Configure l'environnement MySQL avec un mot de passe root et une base de données nommée "smart-house".
-Expose le port 3306 pour permettre l'accès à la base de données depuis l'extérieur.
-backend:
+networks:
+  smarthouse-network:
+    driver: bridge
 
-Construit le service backend à partir du contexte du dossier ./Smart_Home_back.
-Expose le port 8085 pour permettre l'accès au backend.
-Dépend du service MySQL et attend que celui-ci soit démarré avant de lancer le backend.
-Configure l'environnement du backend avec l'URL de la base de données MySQL, le nom d'utilisateur et le mot de passe.
-Utilise une vérification de santé (healthcheck) pour s'assurer que le backend peut accéder à la base de données MySQL.
-frontend:
+volumes:
+  mysql-data:
+```
 
-Construit le service frontend à partir du contexte du dossier ./smartHome-front.
-Expose le port 80 pour permettre l'accès au frontend.
-Dépend du service backend et attend que celui-ci soit démarré avant de lancer le frontend.
-phpmyadmin:
+**Explication :**
 
-Utilise l'image phpMyAdmin pour fournir une interface web pour la gestion de la base de données.
-Configure l'environnement phpMyAdmin avec l'hôte MySQL, le port, et les informations d'identification.
-Expose le port 8081 pour permettre l'accès à phpMyAdmin depuis l'extérieur.
-Assurer d'être dans le répertoire où se trouve le fichier docker-compose.yml, ensuite exécuter la commande suivante pour construire les images Docker pour le backend et le frontend.
+- **mysql** : Base de données avec volume persistant et réseau isolé.
+- **backend** : Service Spring Boot avec healthcheck et redémarrage automatique.
+- **frontend** : Service Angular servi par Nginx.
+- **phpmyadmin** : Interface web pour MySQL.
+- **networks** : Réseau bridge pour l'isolation.
+- **volumes** : Volume pour la persistance des données MySQL.
 
-docker-compose build
+## Installation et Lancement
 
-Etape 4 : Lancer les conteneurs
-Une fois que les images sont construites avec succès, lancer les conteneurs en utilisant la commande suivante :
+1. **Cloner le projet :**
+   ```bash
+   git clone https://github.com/lachgar/smarthouse.git
+   cd smarthouse
+   ```
 
-docker-compose up
-Ajouter l'option -d si vous souhaitez exécuter les conteneurs en arrière-plan.
+2. **Construire les images :**
+   ```bash
+   docker-compose build
+   ```
 
-Etape 5 : Vérifier l'état des conteneurs
-Utiliser la commande suivante pour vérifier l'état des conteneurs :
+3. **Lancer les services :**
+   ```bash
+   docker-compose up -d
+   ```
 
-docker-compose ps
-Assurer que tous les conteneurs sont en cours d'exécution. 
+4. **Vérifier l'état :**
+   ```bash
+   docker-compose ps
+   ```
 
-Etape 6 : Accéder à l'application
-Une fois les conteneurs en cours d'exécution, vous pouvez accéder à votre application frontend à l'adresse http://localhost. Si vous avez configuré PHPMyAdmin, vous pouvez accéder à l'interface à l'adresse http://localhost:8081.
+## Accès à l'Application
 
-Ces étapes devraient permettre de containeriser et de lancer l'application Smart Home. Assurer que les fichiers de configuration (par exemple, les fichiers de propriétés Spring Boot) sont correctement configurés pour fonctionner avec les services Docker.  
+- **Frontend** : http://localhost
+- **phpMyAdmin** : http://localhost:8081 (utilisateur: root, mot de passe: root)
+
+## Dépannage
+
+- Vérifiez que Docker est en cours d'exécution.
+- Consultez les logs : `docker-compose logs [service]`
+- Arrêtez les services : `docker-compose down`
+
+## Technologies Utilisées
+
+- **Backend** : Spring Boot 3.4.0, Java 21, Maven 3.9.9
+- **Frontend** : Angular 18, Node.js 20, TypeScript 5.4
+- **Base de données** : MySQL 8.0
+- **Conteneurisation** : Docker, Docker Compose  
