@@ -1,4 +1,4 @@
-# Application Smart Home - Conteneurisation Spring Boot & Angular
+# TP 24 : Conteneurisation Spring Angular
 
 ## Description
 
